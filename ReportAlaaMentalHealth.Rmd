@@ -61,11 +61,11 @@ The provided R code loads training and testing datasets from CSV files and displ
 It also retrieves the dimensions of the training dataset and provides a summary of its structure and content.
 
 # Load the data
-train_df <- read_csv("C:\\Users\\ASUS\\Desktop\\HarvardX-PH125.9x-Project\\train.csv")
-test_df  <- read_csv("C:\\Users\\ASUS\\Desktop\\HarvardX-PH125.9x-Project\\test.csv")
+train_df <- read_csv("C:\\Alaa\\train.csv")
+test_df  <- read_csv("C:\\Alaa\\test.csv")
 
 # Display the first 6 rows of the dataset
-head(train_df)
+head(train_df))
 
 # Get data format
 data_shape <- dim(train_df)
