@@ -48,11 +48,11 @@ if (!requireNamespace("readr", quietly = TRUE)) {
 }
 
 # Load the data
-train_df <- read_csv("C:\\Users\\ASUS\\Desktop\\HarvardX-PH125.9x-Project\\train.csv")
-test_df  <- read_csv("C:\\Users\\ASUS\\Desktop\\HarvardX-PH125.9x-Project\\test.csv")
+train_url <- "https://example.com/train.csv"  # Replace with your actual URL
+test_url  <- "https://example.com/test.csv"   # Replace with your actual URL
 
 # Display the first 6 rows of the dataset
-head(train_df)
+train_df <- read_csv(train_url)
 
 # Get data format
 data_shape <- dim(train_df)
