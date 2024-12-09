@@ -48,8 +48,8 @@ if (!requireNamespace("readr", quietly = TRUE)) {
 }
 
 # Load the data
-train_df <- read_csv("C:\\Users\\ASUS\\Desktop\\Aprojectharvard\\train.csv")
-test_df  <- read_csv("C:\\Users\\ASUS\\Desktop\\Aprojectharvard\\test.csv")
+train_df <- read_csv("C:\\Alaa\\train.csv")
+test_df  <- read_csv("C:\\Alaa\\test.csv")
 
 # Display the first 6 rows of the dataset
 head(train_df)
