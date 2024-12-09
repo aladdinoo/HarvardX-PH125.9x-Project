@@ -1,0 +1,1162 @@
+---            
+             "HarvardX PH125.9x "
+title:       "Predicting-Mental-Health Project Report"
+author:      "Bouchikhi Alaa Eddine"
+date:        "december 2024 "
+output:      pdf_document
+fig_caption: yes
+---
+
+To start our analysis, we need to install and load essential R packages. Below is the code for this setup:
+
+# Install necessary packages if not already installed
+packages <- c("dplyr", "tidyverse", "readxl", "tinytex", "e1071", "randomForest",
+              "rsample", "xgboost", "adabag", "data.table", "caret", 
+              "ggplot2", "tidyr", "stringr", "forcats", "gridExtra")
+
+new_packages <- packages[!(packages %in% installed.packages()[,"Package"])]
+if(length(new_packages)) install.packages(new_packages)
+
+# Load necessary libraries
+library(dplyr)
+library(tidyverse)
+library(readxl)
+library(tinytex)
+library(e1071)
+library(randomForest)
+library(rsample)
+library(xgboost)
+library(adabag)
+library(data.table)
+library(caret)
+library(readr)      # For reading data
+library(ggplot2)    # For plotting
+library(tidyr)      # For tidying data
+library(stringr)    # For string manipulation
+library(forcats)     # For factor handling
+library(gridExtra)  # For arranging plots
+
+# Suppress warnings
+options(warn = -1)
+
+# Install readr package if not already installed
+if (!requireNamespace("readr", quietly = TRUE)) {
+  install.packages("readr")
+}
+
+
+Introduction
+Mental health is a vital aspect of overall well-being, significantly influencing the quality of life for individuals and communities. In recent years, we have witnessed a marked increase in depression rates worldwide, highlighting the urgent need to understand the factors that contribute to its onset. Depression goes beyond mere feelings of sadness; it is a complex mental health condition that affects how individuals think and behave. If left unaddressed, it can lead to serious complications.
+
+This study aims to explore mental health data to identify the key factors that may increase the risk of developing depression. By analyzing a comprehensive dataset derived from survey responses, we seek to uncover the relationships between various variables, such as age, gender, academic and work-related stress, sleep patterns, and dietary habits.
+
+The primary objective of this project is to build a predictive model that can effectively identify individuals at risk of depression. Through in-depth data exploration and the application of machine learning techniques, we hope to provide valuable insights that can inform early interventions and improve treatment strategies.
+
+The study will unfold in several phases, starting with exploratory data analysis, followed by data preparation, and culminating in the construction and evaluation of the predictive model. By taking this comprehensive approach, we aim to enhance our understanding of depression and contribute to better mental health outcomes within the community.
+
+
+
+
+The provided R code loads training and testing datasets from CSV files and displays the first six rows of the training dataset.
+It also retrieves the dimensions of the training dataset and provides a summary of its structure and content.
+
+# Load the data
+train_df <- read_csv("C:\\Users\\ASUS\\Desktop\\HarvardX-PH125.9x-Project\\train.csv")
+test_df  <- read_csv("C:\\Users\\ASUS\\Desktop\\HarvardX-PH125.9x-Project\\test.csv")
+
+# Display the first 6 rows of the dataset
+head(train_df)
+
+# Get data format
+data_shape <- dim(train_df)
+cat("The train_df has", data_shape[1], "rows and", data_shape[2], "columns.\n")
+
+# Use glimpse to get information about columns
+glimpse(train_df)
+
+# Optionally, you can summarize the dataset
+summary(train_df)
+
+
+
+##Data Preprocessing and Initialization
+The provided R code performs data preprocessing on a training dataset (train_df) and a testing dataset (test_df).
+It counts occurrences of various categorical variables, such as gender, family history of mental illness, and dietary habits, and replaces any invalid entries in these columns with NA. Additionally, it maps sleep duration entries to numerical values and standardizes the degree classifications using predefined valid lists and mappings. 
+Finally, it prints the counts of these variables to aid in understanding the dataset's structure.
+
+# Assuming train_df is your data frame
+gender_counts <- table(train_df$Gender)
+
+# Print the counts
+print(gender_counts)
+
+# Count the occurrences in the "Family History of Mental Illness" column
+family_history_counts <- table(train_df$`Family History of Mental Illness`)
+
+# Print the counts
+print(family_history_counts)
+
+# Count the occurrences in the "Working Professional or Student" column
+working_status_counts <- table(train_df$`Working Professional or Student`)
+
+# Print the counts
+print(working_status_counts)
+
+# Count the occurrences in the "Have you ever had suicidal thoughts?" column
+suicidal_thoughts_counts <- table(train_df$`Have you ever had suicidal thoughts ?`)
+
+# Print the counts
+print(suicidal_thoughts_counts)
+
+# Count the occurrences in the "Dietary Habits" column
+dietary_habits_counts <- table(train_df$`Dietary Habits`)
+
+# Print the counts
+print(dietary_habits_counts)
+
+
+# Define valid dietary habits
+valid_dietary_habits <- c("Healthy", "Unhealthy", "Moderate")
+
+# Replace invalid entries with NA
+train_df$`Dietary Habits` <- ifelse(train_df$`Dietary Habits` %in% valid_dietary_habits, 
+                                     train_df$`Dietary Habits`, 
+                                     NA)
+
+# Print the counts
+print(table(train_df$`Dietary Habits`))
+
+
+library(dplyr)
+
+# Count occurrences of Sleep Duration and arrange in descending order
+sleep_duration_counts <- train_df %>%
+  count(`Sleep Duration`) %>%
+  arrange(desc(n))  # Sort by count in descending order
+
+# Print the sorted counts
+print(sleep_duration_counts)
+
+
+library(dplyr)
+
+# Define valid sleep durations
+valid_sleep_durations <- c(
+    'Less than 5 hours', '1-2 hours', '2-3 hours', '3-4 hours', '4-5 hours',
+    '5-6 hours', '6-7 hours', '7-8 hours', '8-9 hours', '9-11 hours', '10-11 hours',
+    'More than 8 hours'
+)
+
+# Define mapping to numerical values
+sleep_duration_mapping <- c(
+    'Less than 5 hours' = 4,
+    '1-2 hours' = 1.5,
+    '2-3 hours' = 2.5,
+    '3-4 hours' = 3.5,
+    '4-5 hours' = 4.5,
+    '5-6 hours' = 5.5,
+    '6-7 hours' = 6.5,
+    '7-8 hours' = 7.5,
+    '8-9 hours' = 8.5,
+    '9-11 hours' = 10,
+    '10-11 hours' = 10.5,
+    'More than 8 hours' = 9
+)
+
+# Replace invalid entries with NA and map valid entries to numerical values
+train_df$`Sleep Duration` <- ifelse(train_df$`Sleep Duration` %in% valid_sleep_durations,
+                                     train_df$`Sleep Duration`,
+                                     NA)
+
+# Use the mapping to convert valid entries to numerical values
+train_df$`Sleep Duration` <- as.numeric(sleep_duration_mapping[train_df$`Sleep Duration`])
+
+# Print the counts of Sleep Duration after mapping
+print(table(train_df$`Sleep Duration`))
+
+
+library(dplyr)
+
+# Assuming valid_sleep_durations and sleep_duration_mapping are already defined
+
+# Replace invalid entries with NA in test_df
+test_df$`Sleep Duration` <- ifelse(test_df$`Sleep Duration` %in% valid_sleep_durations,
+                                    test_df$`Sleep Duration`,
+                                    NA)
+
+# Map valid entries to numerical values
+test_df$`Sleep Duration` <- as.numeric(sleep_duration_mapping[test_df$`Sleep Duration`])
+
+# Print the counts of Sleep Duration after mapping
+print(table(test_df$`Sleep Duration`))
+
+
+library(dplyr)
+
+# Count occurrences of Degree and arrange in descending order
+degree_counts <- train_df %>%
+  count(Degree) %>%
+  arrange(desc(n))  # Sort by count in descending order
+
+# Print the sorted counts
+print(degree_counts)
+
+library(dplyr)
+
+# Define valid degrees
+valid_degrees <- c(
+    "BHM", "LLB", "B.Pharm", "BBA", "MCA", "MD", "BSc", "ME", "B.Arch",
+    "BCA", "BE", "MA", "B.Ed", "B.Com", "MBA", "M.Com", "MHM", "BA",
+    "Class 12", "M.Tech", "PhD", "M.Ed", "MSc", "B.Tech", "LLM", "MBBS",
+    "M.Pharm", "MPA", "BEd", "B.Sc", "M.Arch", "BArch", "Class 11"
+)
+
+# Define the mapping
+degree_mapping <- c(
+    "B.Sc" = "BSc", "B.Sc." = "BSc", "BEd" = "B.Ed", "M.Tech" = "M.Tech",
+    "MSc" = "MSc", "PhD" = "PhD", "MEd" = "M.Ed", "B.Tech" = "B.Tech",
+    "BE" = "B.E.", "B.Arch" = "B.Arch", "M.Com" = "M.Com", "B.Com" = "B.Com",
+    "BHM" = "BHM", "LLB" = "LLB", "BA" = "BA", "MBA" = "MBA", "M.Arch" = "M.Arch"
+)
+
+# Replace values using the mapping
+train_df$Degree <- recode(train_df$Degree, !!!degree_mapping)
+
+# Replace invalid entries with NA
+train_df$Degree <- ifelse(train_df$Degree %in% valid_degrees, train_df$Degree, NA)
+
+# Print the counts of Degree after mapping
+print(table(train_df$Degree))
+
+library(dplyr)
+
+# Assuming degree_mapping and valid_degrees are already defined
+
+# Replace values using the mapping in test_df
+test_df$Degree <- recode(test_df$Degree, !!!degree_mapping)
+
+# Replace invalid entries with NA
+test_df$Degree <- ifelse(test_df$Degree %in% valid_degrees, test_df$Degree, NA)
+
+# Print the counts of Degree in test_df after mapping
+print(table(test_df$Degree))
+
+
+
+## 1 Handling Missing Data and Correlation Analysis
+counts and displays the number of missing values in each column of the training dataset (train_df).
+ It then removes numeric columns with more than 50% missing values, calculates the correlation matrix for the remaining numeric columns, and visualizes the correlations using a heatmap.
+ This process aids in understanding the relationships between numeric features while managing missing data effectively.
+
+# Count the number of missing values in each column of train_df
+missing_values <- colSums(is.na(train_df))
+
+# Print the counts of missing values
+print(missing_values)
+
+
+
+# Load necessary library
+library(dplyr)
+
+# Select only numeric columns
+numeric_cols_train <- train_df %>% select_if(is.numeric)
+
+# Check the structure of the selected columns
+print(numeric_cols_train)
+
+
+
+# Define a threshold for NA removal (e.g., 50% NA values)
+na_threshold <- 0.5 * nrow(train_df)
+
+# Remove columns with more than the specified threshold of NAs
+numeric_cols_train <- numeric_cols_train %>% select(where(~ sum(is.na(.)) < na_threshold))
+
+# Check remaining numeric columns
+print(numeric_cols_train)
+
+
+
+
+# Check if there are any remaining numeric columns
+if (ncol(numeric_cols_train) > 0) {
+    # Calculate the correlation matrix
+    correlation_matrix_train <- cor(numeric_cols_train, use = "complete.obs")
+    
+    # Print the correlation matrix
+    print(correlation_matrix_train)
+} else {
+    print("No valid numeric columns available for correlation analysis.")
+}
+
+
+
+# Load libraries
+library(reshape2)
+library(ggplot2)
+
+# If you want to use data.table's melt, you can do this:
+# library(data.table)
+
+# Reshape the correlation matrix for visualization
+correlation_melted <- melt(correlation_matrix_train)
+
+# Create the heatmap
+ggplot(data = correlation_melted, aes(Var1, Var2, fill = value)) +
+    geom_tile() +
+    geom_text(aes(label = round(value, 2)), color = "white", size = 4) +
+    scale_fill_gradient2(low = "blue", high = "yellow", mid = "green", 
+                         midpoint = 0, limit = c(-1, 1), space = "Lab", 
+                         name="Correlation") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    labs(title = "Correlation Matrix of Numeric Features")
+	
+	
+	
+
+## 2 p-value Calculation Using Chi-Square Tests
+chi-square tests for several categorical columns in the training dataset (train_df) to assess their relationship with the Depression variable.
+It first checks for any missing columns and filters out rows with NA values before creating contingency tables.
+The p-values from the chi-square tests are then printed, indicating the strength of association between each categorical variable and depression.
+Additionally, it counts and displays the non-missing values for each column, aiding in understanding the dataset's completeness.	
+	
+	
+# Load necessary library
+library(dplyr)
+
+# Updated list of categorical columns to check
+categorical_cols <- c('Gender', 'City', 'Working Professional or Student', 
+                       'Profession', 'Dietary Habits', 'Degree', 
+                       'Have you ever had suicidal thoughts ?', 'Family History of Mental Illness')
+
+# Check for missing columns
+missing_columns <- setdiff(categorical_cols, colnames(train_df))
+if (length(missing_columns) > 0) {
+    cat("The following columns are missing in train_df:\n")
+    print(missing_columns)
+}
+
+# Loop through each categorical column to run chi-square test
+for (col in categorical_cols) {
+    if (col %in% colnames(train_df)) {
+        # Filter out rows with NA values in the current column or the Depression column
+        filtered_data <- train_df %>%
+            filter(!is.na(get(col)), !is.na(Depression))
+        
+        # Create contingency table
+        contingency_table <- table(filtered_data[[col]], filtered_data$Depression)
+        
+        # Perform chi-square test if contingency_table has more than one level
+        if (nrow(contingency_table) > 1 && ncol(contingency_table) > 1) {
+            chi_square_result <- chisq.test(contingency_table)
+            
+            # Print p-value
+            cat(paste(col, ": p-value =", chi_square_result$p.value), "\n")
+        } else {
+            cat(paste(col, ": Not enough levels for Chi-square test"), "\n")
+        }
+    } else {
+        cat(paste(col, ": Column not found in train_df"), "\n")
+    }
+}
+
+
+
+# Count non-NA values for each column in train_df
+non_na_counts <- colSums(!is.na(train_df))
+
+# Display the counts
+print(non_na_counts)
+
+
+
+# 3. Data Cleaning and Missing Value Handling
+This R code segment focuses on cleaning the training (train_df) and testing (test_df) datasets.
+It begins by checking existing column names and drops specified columns that are no longer needed.
+Missing values in numerical columns, such as Work Pressure, Job Satisfaction, Financial Stress, and Sleep Duration, are filled with the mean of their respective columns. 
+For the categorical column Dietary Habits, missing values are filled with the mode. 
+Finally, the code checks and displays any remaining missing values in both datasets, ensuring data integrity before further analysis.
+
+
+# Check the existing column names
+existing_columns <- colnames(train_df)
+
+# List of columns to drop (update based on your existing columns)
+columns_to_drop <- c("Academic Pressure", "CGPA", "City", "Degree", "Profession", "Study Satisfaction")
+
+# Keep only the columns that exist in the DataFrame
+columns_to_drop <- columns_to_drop[columns_to_drop %in% existing_columns]
+
+# Drop specified columns from train_df and test_df
+train_df <- train_df %>%
+    select(-all_of(columns_to_drop))
+
+test_df <- test_df %>%
+    select(-all_of(columns_to_drop))
+
+# Fill missing values in numerical columns with the mean
+numeric_cols <- c('Work Pressure', 'Job Satisfaction', 'Financial Stress', 'Sleep Duration')
+
+fill_na_with_mean <- function(df, col) {
+    df[[col]] <- ifelse(is.na(df[[col]]), mean(df[[col]], na.rm = TRUE), df[[col]])
+    return(df)
+}
+
+for (col in numeric_cols) {
+    train_df <- fill_na_with_mean(train_df, col)
+    test_df <- fill_na_with_mean(test_df, col)
+}
+
+# Function to fill missing values with the mode
+fill_na_with_mode <- function(df, col) {
+    mode_value <- as.character(names(sort(table(df[[col]]), decreasing = TRUE)[1]))
+    df[[col]][is.na(df[[col]])] <- mode_value
+    return(df)
+}
+
+# Fill missing values in 'Dietary Habits' with the mode
+train_df <- fill_na_with_mode(train_df, "Dietary Habits")
+test_df <- fill_na_with_mode(test_df, "Dietary Habits")
+
+# Check for remaining missing values
+remaining_na_counts_train <- colSums(is.na(train_df))
+remaining_na_counts_test <- colSums(is.na(test_df))
+
+# Display remaining missing values
+print(remaining_na_counts_train)
+print(remaining_na_counts_test)
+
+
+## 3 Distribution of Age
+creates a histogram to visualize the age distribution in the training dataset (train_df). 
+It includes a blue line and points to enhance the clarity of the frequency counts for different age groups.
+
+# Load necessary libraries
+library(ggplot2)
+
+# Create a histogram of the Age distribution
+age_plot <- ggplot(train_df, aes(x = Age)) +
+    geom_histogram(aes(y = ..count..), bins = 15, fill = "lightblue", color = "black", alpha = 0.7) +
+    labs(title = "Distribution of Age", x = "Age", y = "Frequency") +
+    theme_minimal()
+
+# Add a blue line and points to the histogram
+age_plot + 
+    geom_line(stat = "bin", aes(y = ..count..), bins = 15, color = "blue", size = 1, group = 1) +  # Ensure line is drawn
+    geom_point(stat = "bin", aes(y = ..count..), bins = 15, color = "blue", size = 3)  # Points along the line
+	
+	
+	
+
+## 4 Distribution of Financial_Stress
+creates a faceted histogram to show the distribution of Financial Stress levels across different genders in the training dataset (train_df). 
+Each facet allows for easy comparison of financial stress frequencies among genders.
+
+
+# Assuming you have a categorical variable, e.g. "Gender"
+facet_plot <- ggplot(train_df, aes(x = `Financial Stress`)) +
+    geom_histogram(bins = 5, fill = "lightgreen", color = "black", alpha = 0.7) +
+    labs(title = "Distribution of Financial Stress by Gender", x = "Financial Stress", y = "Frequency") +
+    facet_wrap(~ Gender) + 
+    theme_minimal()
+
+# Display the facet plot
+print(facet_plot)
+
+
+## 5 Distribution of Work_or_Study_Hours
+creates a bar plot to visualize the distribution of work or study hours categorized by gender in the training dataset. 
+Using a summary data frame with frequency counts, the plot displays the number of individuals in various hour categories for both females and males. 
+The addition of data labels above the bars enhances clarity, making it easy to compare the frequencies across genders.
+
+
+
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# Create a summary data frame (if not already created)
+frequency_counts_by_gender <- data.frame(
+  Gender = c(rep("Female", 7), rep("Male", 7)),
+  Category = c("0", "2", "4", "6", "8", "10", "More than 10",
+               "0", "2", "4", "6", "8", "10", "More than 10"),
+  n = c(5375, 9013, 8418, 8950, 8221, 11772, 10695,
+        6558, 11147, 9912, 10570, 10336, 14811, 13223)
+)
+
+# Create the bar plot
+work_study_hours_plot <- ggplot(frequency_counts_by_gender, aes(x = Category, y = n, fill = Gender)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(title = "Distribution of Work or Study Hours by Gender", 
+         x = "Work or Study Hours", 
+         y = "Frequency") +
+    theme_minimal() +
+    geom_text(aes(label = n), position = position_dodge(width = 0.9), vjust = -0.5)  # Add counts above bars
+
+# Display the plot
+print(work_study_hours_plot)
+
+
+
+## 6 Count plot for Gender
+generates a count plot to visualize the distribution of gender in the training dataset (train_df). 
+It uses custom colors for males and females, with data labels displayed above the bars for clarity, enhancing readability with increased text size and a centered title.
+
+
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# Create a count plot for Gender
+gender_count_plot <- ggplot(train_df, aes(x = Gender, fill = Gender)) +
+    geom_bar(color = "black", alpha = 0.7) +
+    labs(title = "Count of Gender", 
+         x = "Gender", 
+         y = "Count") +
+    scale_fill_manual(values = c("Female" = "lightpink", "Male" = "lightblue")) +  # Custom colors
+    theme_minimal() +
+    theme(text = element_text(size = 14),  # Increase text size for better readability
+          plot.title = element_text(hjust = 0.5, size = 16)) +  # Center title and increase size
+    geom_text(stat = 'count', aes(label = ..count..), 
+              position = position_stack(vjust = 0.5),  # Position text above the bars
+              size = 5, color = "black")
+
+# Display the plot
+print(gender_count_plot)
+
+
+
+## 7 Count plot for Have_you_ever_had_suicidal_thoughts 
+The plot features side-by-side bars for males and females, with custom colors and data labels above the bars, enhancing clarity and readability.
+
+
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# Create a count plot for "Have you ever had suicidal thoughts ?", faceted by Gender
+suicidal_thoughts_plot <- ggplot(train_df, aes(x = `Have you ever had suicidal thoughts ?`, fill = Gender)) +
+    geom_bar(color = "black", alpha = 0.7, position = "dodge") +  # Bars side by side
+    labs(title = "Count of Suicidal Thoughts by Gender", 
+         x = "Suicidal Thoughts", 
+         y = "Count") +
+    scale_fill_manual(values = c("Female" = "lightpink", "Male" = "lightblue")) +  # Custom colors
+    theme_minimal() +
+    theme(text = element_text(size = 14),  # Increase text size
+          plot.title = element_text(hjust = 0.5, size = 16)) +  # Center title
+    geom_text(stat = 'count', aes(label = ..count..), 
+              position = position_dodge(width = 0.9),  # Position text above bars
+              vjust = -0.5, size = 5, color = "black")
+
+# Display the plot
+print(suicidal_thoughts_plot)
+
+
+
+## 8-Distribution of Sleep_Duration
+visualizes the distribution of sleep duration in the training dataset by creating a categorical variable for sleep duration and generating a bar plot. The plot displays the frequency of different sleep duration categories for males and females, using custom colors and data labels above the bars for clarity. 
+After plotting, the temporary categorical variable is removed from the dataset to maintain its original structure.
+
+
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# Create a new categorical variable for Sleep Duration
+train_df <- train_df %>%
+    mutate(Sleep_Duration_Category = cut(`Sleep Duration`, 
+                                          breaks = seq(0, 12, by = 2), 
+                                          include.lowest = TRUE, 
+                                          labels = c("0-2", "2-4", "4-6", "6-8", "8-10", "10-12")))
+
+# Create a bar plot of Sleep Duration by Gender
+sleep_duration_plot <- ggplot(train_df, aes(x = Sleep_Duration_Category, fill = Gender)) +
+    geom_bar(position = "dodge", color = "black", alpha = 0.7) +
+    labs(title = "Distribution of Sleep Duration by Gender", 
+         x = "Sleep Duration (Hours)", 
+         y = "Frequency") +
+    scale_fill_manual(values = c("Female" = "lightpink", "Male" = "lightblue")) +  # Custom colors
+    theme_minimal() +
+    theme(text = element_text(size = 14),  # Increase text size
+          plot.title = element_text(hjust = 0.5, size = 16)) +  # Center title
+    geom_text(stat = "count", aes(label = ..count..), 
+              position = position_dodge(width = 0.9), 
+              vjust = -0.5, size = 4, color = "black")  # Counts above bars
+
+# Display the plot
+print(sleep_duration_plot)
+
+# Remove the Sleep_Duration_Category column
+train_df <- train_df %>%
+    select(-Sleep_Duration_Category)
+
+
+## 9-Age vs Depression
+ the relationship between age and depression by grouping individuals into age categories and visualizing their depression status. 
+ The bar plot effectively displays the distribution of depression across various age groups, highlighting trends and differences in prevalence. 
+ This visualization offers insights into the potential impact of age on mental health outcomes.
+
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# Create age categories for better visualization
+train_df <- train_df %>%
+    mutate(Age_Category = cut(Age, breaks = seq(0, 100, by = 10), 
+                              right = FALSE, 
+                              labels = paste(seq(0, 90, by = 10), seq(10, 100, by = 10), sep = "-")))
+
+# Create a bar plot for Age Categories vs. Depression
+age_depression_bar_plot <- ggplot(train_df, aes(x = Age_Category, fill = Depression)) +
+    geom_bar(position = "dodge", color = "black", alpha = 0.7) +  # Set position to dodge for side-by-side bars
+    labs(title = "Age Distribution by Depression Status", 
+         x = "Age Categories", 
+         y = "Count") +
+    scale_fill_manual(values = c("0" = "#66c2a5", "1" = "#fc8d62"), 
+                      name = "Depression Status", 
+                      labels = c("0" = "No Depression", "1" = "Depressed")) +  # Custom colors and labels
+    theme_minimal(base_size = 15) +  # Increase base font size
+    theme(plot.title = element_text(hjust = 0.5, size = 18),  # Center title
+          panel.grid.major = element_line(color = "gray80"),  # Customize grid
+          panel.grid.minor = element_blank()) +  # Remove minor grid lines
+    geom_text(stat = "count", aes(label = ..count..), 
+              position = position_dodge(width = 0.9), 
+              vjust = -0.5, size = 4, color = "black")  # Add count labels above bars
+
+# Display the plot
+print(age_depression_bar_plot)
+
+# Remove the Age_Category column
+train_df <- train_df %>%
+    select(-Age_Category)
+
+
+
+## 11-Financial_Stress vs Depression
+This visualization shows how financial stress levels vary between individuals with and without depression. 
+The bar plot displays the average financial stress for each group, using a gradient color scheme to highlight the differences. 
+It effectively illustrates the potential impact of depression on financial well-being.
+
+
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# Calculate the mean Financial Stress by Depression status
+financial_stress_summary <- train_df %>%
+    group_by(Depression) %>%
+    summarise(mean_financial_stress = mean(`Financial Stress`, na.rm = TRUE))
+
+# Create a colored bar plot with gradients
+financial_stress_plot_stylish <- ggplot(financial_stress_summary, aes(x = as.factor(Depression), y = mean_financial_stress, fill = mean_financial_stress)) +
+    geom_bar(stat = "identity", color = "black", alpha = 0.8) +  # Create the bar plot
+    scale_fill_gradient(low = "#66c2a5", high = "#fc8d62") +  # Gradient color based on mean financial stress
+    labs(title = "Financial Stress vs Depression", 
+         x = "Depression Status", 
+         y = "Mean Financial Stress") +
+    theme_minimal(base_size = 15) +  # Use a minimal theme
+    theme(plot.title = element_text(hjust = 0.5, size = 18),  # Center title
+          text = element_text(size = 14)) +  # Increase text size
+    geom_text(aes(label = round(mean_financial_stress, 1)), vjust = -0.5, size = 5)  # Add labels above the bars
+
+# Display the plot
+print(financial_stress_plot_stylish)
+
+
+
+
+## 12-Gender vs Depression
+the connection between gender and depression by displaying the counts of individuals with and without depression for each gender. 
+The bar plot emphasizes the differences in depression prevalence among males and females, with counts clearly labeled above each bar. 
+Such visualization offers important insights into the potential influence of gender on mental health outcomes.
+
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# Create a count summary for Gender and Depression
+count_summary <- train_df %>%
+    group_by(Gender, Depression) %>%
+    summarise(count = n()) %>%
+    ungroup()
+
+# Create a count plot for Gender vs. Depression
+gender_depression_plot <- ggplot(count_summary, aes(x = Gender, y = count, fill = as.factor(Depression))) +
+    geom_bar(stat = "identity", position = "dodge", color = "black", alpha = 0.7) +  # Create the count plot
+    geom_text(aes(label = count), position = position_dodge(width = 0.9), vjust = -0.5, size = 5) +  # Add counts above bars
+    labs(title = "Gender vs Depression", 
+         x = "Gender", 
+         y = "Count") +
+    scale_fill_manual(values = c("0" = "#66c2a5", "1" = "#fc8d62"),  # Custom colors for each depression status
+                      labels = c("0" = "No Depression", "1" = "Depressed")) +  # Custom labels
+    theme_minimal(base_size = 15) +  # Use a minimal theme
+    theme(plot.title = element_text(hjust = 0.5, size = 18),  # Center title
+          text = element_text(size = 14))  # Increase text size
+
+# Display the plot
+print(gender_depression_plot)
+
+
+
+## 13-Work_or_Study_Hours vs Depression
+This analysis reveals how work or study hours relate to depression, showing the counts of individuals with and without depression in each hour category. 
+The bar plot provides a clear view of the potential impact of time spent working or studying on mental health.
+
+
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# Create a count summary for Work or Study Hours and Depression
+count_summary <- train_df %>%
+    group_by(`Work/Study Hours`, Depression) %>%
+    summarise(count = n()) %>%
+    ungroup()
+
+# Create a count plot for Work or Study Hours vs. Depression
+work_study_hours_plot <- ggplot(count_summary, aes(x = as.factor(`Work/Study Hours`), y = count, fill = as.factor(Depression))) +
+    geom_bar(stat = "identity", position = "dodge", color = "black", alpha = 0.7) +  # Create the count plot
+    labs(title = "Work or Study Hours vs Depression", 
+         x = "Work or Study Hours", 
+         y = "Count") +
+    scale_fill_manual(values = c("0" = "#66c2a5", "1" = "#fc8d62"),  # Custom colors for each depression status
+                      labels = c("0" = "No Depression", "1" = "Depressed")) +  # Custom labels
+    theme_minimal(base_size = 15) +  # Use a minimal theme
+    theme(plot.title = element_text(hjust = 0.5, size = 18),  # Center title
+          text = element_text(size = 14))  # Increase text size
+
+# Display the plot
+print(work_study_hours_plot)
+
+
+
+##  13-Sleep_Duration' vs Depression`
+This analysis examines how sleep duration correlates with depression, showing counts of individuals with and without depression for each sleep duration category. 
+The bar plot highlights potential links between sleep patterns and mental health.
+
+
+
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# Create a count summary for Sleep Duration and Depression
+count_summary <- train_df %>%
+    group_by(`Sleep Duration`, Depression) %>%
+    summarise(count = n()) %>%
+    ungroup()
+
+# Create a count plot for Sleep Duration vs. Depression
+sleep_duration_plot <- ggplot(count_summary, aes(x = as.factor(`Sleep Duration`), y = count, fill = as.factor(Depression))) +
+    geom_bar(stat = "identity", position = "dodge", color = "black", alpha = 0.7) +  # Create the count plot
+    geom_text(aes(label = count), position = position_dodge(width = 0.9), vjust = -0.5, size = 5) +  # Add counts above bars
+    labs(title = "Sleep Duration vs Depression", 
+         x = "Sleep Duration (Hours)", 
+         y = "Count") +
+    scale_fill_manual(values = c("0" = "#66c2a5", "1" = "#fc8d62"),  # Custom colors for each depression status
+                      labels = c("0" = "No Depression", "1" = "Depressed")) +  # Custom labels
+    theme_minimal(base_size = 15) +  # Use a minimal theme
+    theme(plot.title = element_text(hjust = 0.5, size = 18),  # Center title
+          text = element_text(size = 14))  # Increase text size
+
+# Display the plot
+print(sleep_duration_plot)
+
+
+
+
+## 14-Preprocessing data
+This step focuses on preprocessing the dataset by scaling selected numerical columns. 
+Both standard scaling and Min-Max normalization are applied to the training and testing data. 
+This ensures that the features are on a similar scale, which is crucial for many machine learning algorithms. 
+The processed data is then displayed to verify the transformations.
+
+
+
+# Load necessary libraries
+library(dplyr)
+library(scales)
+
+# Select columns to scale
+columns_to_scale <- c('Age', 'Work Pressure', 'Job Satisfaction', 'Sleep Duration', 'Work/Study Hours', 'Financial Stress')
+
+# Standard scaling for training data
+df_scaled_train <- train_df %>%
+    select(all_of(columns_to_scale)) %>%
+    as.data.frame() %>%
+    scale() %>%
+    as.data.frame()
+
+# Min-Max scaling for training data
+min_max_scaler <- function(df) {
+    df_scaled <- as.data.frame(lapply(df, function(x) rescale(x, to = c(0, 1))))
+    return(df_scaled)
+}
+
+df_normalized_train <- min_max_scaler(df_scaled_train)
+
+# Standard scaling for test data
+df_scaled_test <- test_df %>%
+    select(all_of(columns_to_scale)) %>%
+    as.data.frame() %>%
+    scale() %>%
+    as.data.frame()
+
+# Min-Max scaling for test data using the same scaler as training data
+df_normalized_test <- min_max_scaler(df_scaled_test)
+
+# Set column names
+colnames(df_normalized_train) <- columns_to_scale
+colnames(df_normalized_test) <- columns_to_scale
+
+# Display the scaled and normalized data
+print(head(df_normalized_train))
+print(head(df_normalized_test))
+
+
+
+## 15-Convert Categorical Data into Numerical
+This process focuses on transforming categorical variables into numerical formats for machine learning. Initially, categorical columns are converted to factor types, followed by One-Hot Encoding to create binary variables. 
+The first level of each encoding is dropped to prevent multicollinearity. 
+Additionally, any logical values in the dataset are converted to integers (1 for TRUE, 0 for FALSE). 
+The resulting dataframes are then displayed to confirm the transformations.
+
+
+
+
+# Load necessary libraries
+library(dplyr)
+library(caret)
+
+# Define categorical columns
+categorical_columns <- c('Gender', 'Working Professional or Student', 'Have you ever had suicidal thoughts ?', 'Dietary Habits', 'Family History of Mental Illness')
+
+# Convert categorical columns to factors (Label Encoding for binary and preparation for One-hot Encoding)
+train_df <- train_df %>%
+    mutate(across(all_of(categorical_columns), as.factor))
+
+test_df <- test_df %>%
+    mutate(across(all_of(categorical_columns), as.factor))
+
+# One-hot Encoding
+dummies_train <- dummyVars(~ ., data = train_df %>% select(all_of(categorical_columns)))
+train_df <- cbind(train_df %>% select(-all_of(categorical_columns)), 
+                  as.data.frame(predict(dummies_train, newdata = train_df)))
+
+dummies_test <- dummyVars(~ ., data = test_df %>% select(all_of(categorical_columns)))
+test_df <- cbind(test_df %>% select(-all_of(categorical_columns)), 
+                 as.data.frame(predict(dummies_test, newdata = test_df)))
+
+# Drop the first level to avoid multicollinearity (equivalent to drop_first=True in Python)
+train_df <- train_df %>% select(-matches("\\.1$"))
+test_df <- test_df %>% select(-matches("\\.1$"))
+
+# Display the head of the transformed dataframes
+print(head(train_df))
+print(head(test_df))
+
+
+
+
+# Load necessary libraries
+library(dplyr)
+
+# Function to convert TRUE/FALSE to 1/0
+convert_bool_to_int <- function(df) {
+  df %>%
+    mutate(across(where(is.logical), ~ if_else(.x, 1L, 0L)))
+}
+
+# Apply the function to both train_df and test_df
+train_df <- convert_bool_to_int(train_df)
+test_df <- convert_bool_to_int(test_df)
+
+# Display the head of the transformed dataframes
+print(head(train_df))
+print(head(test_df))
+
+
+## 15-predect
+In this step, the dataset is prepared for prediction by selecting the relevant features and target variable. 
+The training data is split into training and validation sets using an 80-20 ratio, ensuring that the model can be validated effectively. 
+The dimensions of the split datasets are displayed to confirm the successful partitioning, providing a clear overview of the training and validation data sizes.
+
+
+# Load necessary libraries
+library(dplyr)
+library(caret)
+
+# Selecting features and target variable
+X_train <- train_df %>%
+    select(-id, -Name, -Depression)
+
+y_train <- train_df$Depression
+
+# Split the training data into training and validation sets (80-20 split)
+set.seed(42)  # For reproducibility
+train_index <- createDataPartition(y_train, p = 0.8, list = FALSE)
+
+X_train_split <- X_train[train_index, ]
+X_val_split <- X_train[-train_index, ]
+y_train_split <- y_train[train_index]
+y_val_split <- y_train[-train_index]
+
+# Display the dimensions of the split datasets to verify
+print(dim(X_train_split))
+print(dim(X_val_split))
+print(length(y_train_split))
+print(length(y_val_split))
+
+
+
+## 15-Model Building
+## Random Forest Classifier
+A Random Forest model is constructed to predict depression status, with performance evaluated through a confusion matrix and ROC-AUC score on the validation set. 
+The ROC curve visualizes the relationship between the true positive rate and the false positive rate. 
+The AUC value measures the model's classification effectiveness, where higher scores signify improved performance.
+
+# Load necessary libraries
+library(randomForest)
+library(caret)
+library(e1071)  # For confusionMatrix
+library(pROC)   # For ROC-AUC calculation
+
+# Build the Random Forest model
+set.seed(42)  # For reproducibility
+rf_model <- randomForest(x = X_train_split, y = as.factor(y_train_split), ntree = 100)
+
+# Make predictions on the validation set
+y_val_pred_rf <- predict(rf_model, X_val_split, type = "response")
+
+# Print classification report
+conf_matrix <- confusionMatrix(y_val_pred_rf, as.factor(y_val_split))
+print(conf_matrix)
+
+# Calculate ROC-AUC score
+y_pred_prob <- predict(rf_model, X_val_split, type = "prob")[,2]
+roc_auc_rf <- roc(as.numeric(y_val_split) - 1, y_pred_prob)$auc
+print(paste("Random Forest - ROC-AUC Score:", roc_auc_rf))
+
+
+
+# 16-Plot ROC curve  Random Forest Classifier
+
+
+# Load necessary libraries
+library(randomForest)
+library(caret)
+library(e1071)  # For confusionMatrix
+library(pROC)   # For ROC-AUC calculation
+library(ggplot2) # For plotting
+
+# Build the Random Forest model
+set.seed(42)  # For reproducibility
+rf_model <- randomForest(x = X_train_split, y = as.factor(y_train_split), ntree = 100)
+
+# Make predictions on the validation set
+y_val_pred_rf <- predict(rf_model, X_val_split, type = "response")
+
+# Print classification report
+conf_matrix <- confusionMatrix(y_val_pred_rf, as.factor(y_val_split))
+print(conf_matrix)
+
+# Calculate ROC-AUC score
+y_pred_prob <- predict(rf_model, X_val_split, type = "prob")[,2]
+roc_auc_rf <- roc(as.numeric(y_val_split) - 1, y_pred_prob)$auc
+print(paste("Random Forest - ROC-AUC Score:", roc_auc_rf))
+
+# Get the fpr, tpr, and thresholds
+roc_obj <- roc(as.numeric(y_val_split) - 1, y_pred_prob)
+fpr <- 1 - roc_obj$specificities
+tpr <- roc_obj$sensitivities
+thresholds <- roc_obj$thresholds
+
+# Plot ROC curve
+roc_df <- data.frame(fpr = fpr, tpr = tpr, thresholds = thresholds)
+
+ggplot(roc_df, aes(x = fpr, y = tpr)) +
+  geom_line(color = 'blue') +
+  geom_abline(intercept = 0, slope = 1, color = 'gray', linetype = 'dashed') +
+  ggtitle('ROC Curve for RFC Model') +
+  xlab('False Positive Rate') +
+  ylab('True Positive Rate') +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  annotate("text", x = 0.5, y = 0.1, label = paste("AUC =", round(roc_auc_rf, 4)), color = "blue")
+  
+  
+  
+
+
+## 17- Logistic Regression
+A Logistic Regression model is developed to predict depression status, with predictions generated on the validation set and evaluated through a confusion matrix and ROC-AUC score. 
+The ROC curve illustrates the balance between the true positive rate and false positive rate, while the AUC value provides a summary of the model's classification capability. Higher AUC scores reflect a better ability to differentiate between the two classes.
+
+
+# Load necessary libraries
+library(caret)
+library(e1071)  # For confusionMatrix
+library(pROC)   # For ROC-AUC calculation
+
+# Build the Logistic Regression model
+lr_model <- glm(y_train_split ~ ., data = X_train_split, family = binomial)
+
+# Make predictions on the validation set
+y_val_pred_lr <- predict(lr_model, newdata = X_val_split, type = "response")
+
+# Convert probabilities to class labels
+y_val_pred_lr_class <- ifelse(y_val_pred_lr > 0.5, 1, 0)
+
+# Print classification report
+conf_matrix <- confusionMatrix(as.factor(y_val_pred_lr_class), as.factor(y_val_split))
+print(conf_matrix)
+
+# Calculate ROC-AUC score
+roc_auc_lr <- roc(as.numeric(y_val_split) - 1, y_val_pred_lr)$auc
+print(paste("Logistic Regression - ROC-AUC Score:", roc_auc_lr))
+
+
+
+
+# 17- Plot ROC curve Logistic Regression
+
+
+# Load necessary libraries
+library(caret)
+library(e1071)  # For confusionMatrix
+library(pROC)   # For ROC-AUC calculation
+library(ggplot2) # For plotting
+
+# Build the Logistic Regression model
+lr_model <- glm(y_train_split ~ ., data = X_train_split, family = binomial)
+
+# Make predictions on the validation set
+y_val_pred_lr <- predict(lr_model, newdata = X_val_split, type = "response")
+
+# Convert probabilities to class labels
+y_val_pred_lr_class <- ifelse(y_val_pred_lr > 0.5, 1, 0)
+
+# Print classification report
+conf_matrix <- confusionMatrix(as.factor(y_val_pred_lr_class), as.factor(y_val_split))
+print(conf_matrix)
+
+# Calculate ROC-AUC score
+roc_obj <- roc(as.numeric(y_val_split) - 1, y_val_pred_lr)
+roc_auc_lr <- roc_obj$auc
+print(paste("Logistic Regression - ROC-AUC Score:", roc_auc_lr))
+
+# Get the fpr, tpr, and thresholds
+fpr2 <- 1 - roc_obj$specificities
+tpr2 <- roc_obj$sensitivities
+thresholds2 <- roc_obj$thresholds
+
+# Plot ROC curve
+roc_df <- data.frame(fpr = fpr2, tpr = tpr2, thresholds = thresholds2)
+
+ggplot(roc_df, aes(x = fpr, y = tpr)) +
+  geom_line(color = 'blue') +
+  geom_abline(intercept = 0, slope = 1, color = 'gray', linetype = 'dashed') +
+  ggtitle('ROC Curve for LR Model') +
+  xlab('False Positive Rate') +
+  ylab('True Positive Rate') +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  annotate("text", x = 0.5, y = 0.1, label = paste("AUC =", round(roc_auc_lr, 4)), color = "blue")
+  
+  
+  
+  
+
+## 18- XGBoost
+This approach employs an XGBoost model to predict depression status, training it on the prepared data and evaluating performance using a confusion matrix and ROC-AUC score. 
+The ROC-AUC score indicates the model's effectiveness in distinguishing between depressed and non-depressed individuals, with higher scores reflecting better performance.
+
+# Load necessary libraries
+library(xgboost)
+library(caret)
+library(e1071)  # For confusionMatrix
+library(pROC)   # For ROC-AUC calculation
+
+# Convert training and validation data to xgb.DMatrix
+dtrain <- xgb.DMatrix(data = as.matrix(X_train_split), label = y_train_split)
+dval <- xgb.DMatrix(data = as.matrix(X_val_split), label = y_val_split)
+
+# Build the XGBoost model
+set.seed(42)  # For reproducibility
+xgb_params <- list(
+  objective = "binary:logistic",
+  eval_metric = "auc",
+  max_depth = 6,
+  eta = 0.1
+)
+
+xgb_model <- xgb.train(params = xgb_params, data = dtrain, nrounds = 100)
+
+# Make predictions on the validation set
+y_val_pred_xgb <- predict(xgb_model, dval)
+
+# Convert probabilities to class labels
+y_val_pred_xgb_class <- ifelse(y_val_pred_xgb > 0.5, 1, 0)
+
+# Print classification report
+conf_matrix <- confusionMatrix(as.factor(y_val_pred_xgb_class), as.factor(y_val_split))
+print(conf_matrix)
+
+# Calculate ROC-AUC score
+roc_auc_xgb <- roc(as.numeric(y_val_split) - 1, y_val_pred_xgb)$auc
+print(paste("xgboost - ROC-AUC Score:", roc_auc_xgb))
+
+
+
+## 18- Gradient Boosting Machine (GBM)
+A Gradient Boosting Machine (GBM) model is used to predict depression status based on the training data. 
+After training the model, predictions are made on the validation set, and its performance is evaluated using a confusion matrix and ROC-AUC score, indicating how well the model can distinguish between individuals with and without depression
+
+
+install.packages("gbm")
+# Load necessary libraries
+library(gbm)
+library(caret)
+library(e1071)  # For confusionMatrix
+library(pROC)   # For ROC-AUC calculation
+
+# Build the GBM model
+set.seed(42)  # For reproducibility
+gbm_model <- gbm(
+  formula = y_train_split ~ .,
+  data = X_train_split,
+  distribution = "bernoulli",
+  n.trees = 100,
+  interaction.depth = 3,
+  shrinkage = 0.1,
+  cv.folds = 5
+)
+
+# Make predictions on the validation set
+y_val_pred_gbm <- predict(gbm_model, newdata = X_val_split, n.trees = gbm.perf(gbm_model, method = "cv"), type = "response")
+
+# Convert probabilities to class labels
+y_val_pred_gbm_class <- ifelse(y_val_pred_gbm > 0.5, 1, 0)
+
+# Print classification report
+conf_matrix <- confusionMatrix(as.factor(y_val_pred_gbm_class), as.factor(y_val_split))
+print(conf_matrix)
+
+# Calculate ROC-AUC score
+roc_auc_gbm <- roc(as.numeric(y_val_split) - 1, y_val_pred_gbm)$auc
+print(paste("GBM - ROC-AUC Score:", roc_auc_gbm))
+
+
+
+
+In predicting depression, four models were evaluated: Random Forest, Gradient Boosting Machine (GBM), Logistic Regression, and XGBoost. All models performed well, with XGBoost achieving the highest accuracy at 93.25% and a ROC-AUC score of 0.9694, indicating excellent discrimination. GBM and Logistic Regression followed closely, showing strong sensitivity and comparable performance. Random Forest, while slightly lower in accuracy at 92.94%, still demonstrated effective classification. 
+Overall, these results highlight the potential of machine learning techniques in early depression detection, with XGBoost being the most effective choice among the models tested.
+
+Conclusion
+The use of these models for predicting depression illustrates the potential of machine learning techniques to enhance early detection of depression. Based on the findings, XGBoost stands out as the most reliable option due to its high accuracy and discriminative power. However, considering the combination of multiple models could further improve predictive accuracy, ultimately contributing to better clinical outcomes and informed decision-making in healthcare.
+
+
+
+
