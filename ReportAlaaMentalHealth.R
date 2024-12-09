@@ -48,11 +48,11 @@ if (!requireNamespace("readr", quietly = TRUE)) {
 }
 
 # Load the data
-train_url <- "https://github.com/aladdinoo/HarvardX-PH125.9x-Project/blob/main/train.csv"  
-test_url  <- "https://github.com/aladdinoo/HarvardX-PH125.9x-Project/blob/main/test.csv"   
+train_df <- read_csv("C:\\Users\\ASUS\\Desktop\\Aprojectharvard\\train.csv")
+test_df  <- read_csv("C:\\Users\\ASUS\\Desktop\\Aprojectharvard\\test.csv")
 
 # Display the first 6 rows of the dataset
-train_df <- read_csv(train_url)
+head(train_df)
 
 # Get data format
 data_shape <- dim(train_df)
