@@ -48,8 +48,8 @@ if (!requireNamespace("readr", quietly = TRUE)) {
 }
 
 # Load the data
-train_url <- "https://example.com/train.csv"  # Replace with your actual URL
-test_url  <- "https://example.com/test.csv"   # Replace with your actual URL
+train_url <- "https://github.com/aladdinoo/HarvardX-PH125.9x-Project/blob/main/train.csv"  
+test_url  <- "https://github.com/aladdinoo/HarvardX-PH125.9x-Project/blob/main/test.csv"   
 
 # Display the first 6 rows of the dataset
 train_df <- read_csv(train_url)
